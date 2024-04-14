@@ -21,9 +21,9 @@ custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img n
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 
-train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = False, transform= custom_transforms)
-val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = False, transform= custom_transforms)
-test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = False, transform= custom_transforms)
+train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform= custom_transforms)
+val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
+test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
 
 train_loader = DataLoader(train_set, batch_size=32, shuffle=True)
 val_loader = DataLoader(val_set, batch_size=32, shuffle=True)
@@ -53,16 +53,16 @@ loss_fun, optimizer = get_essentials()
 
 # training and validation loops
 
-train_epoch, val_epoch = [], []
-for epoch in range(epochs):
-  train_batch_losses, val_batch_losses = [], []
-  for data in train_loader:
-    train_batch_loss = train_batch(data, model, loss_fun, optimizer)
-    train_batch_losses.append(train_batch_loss)
-  for data in test_dataloader:
-    val_batch_loss = val_batch(data, model, loss_fun, optimizer)
-    val_batch_losses.append(val_batch_loss)
-  train_epoch.append(np.mean(train_batch_losses))
-  val_epoch.append(np.mean(val_batch_losses))
+# train_epoch, val_epoch = [], []
+# for epoch in range(epochs):
+#   train_batch_losses, val_batch_losses = [], []
+#   for data in train_loader:
+#     train_batch_loss = train_batch(data, model, loss_fun, optimizer)
+#     train_batch_losses.append(train_batch_loss)
+#   for data in test_dataloader:
+#     val_batch_loss = val_batch(data, model, loss_fun, optimizer)
+#     val_batch_losses.append(val_batch_loss)
+#   train_epoch.append(np.mean(train_batch_losses))
+#   val_epoch.append(np.mean(val_batch_losses))
 
 
