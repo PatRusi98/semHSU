@@ -15,7 +15,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # data = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = False, transform= transforms.ToTensor())
 
 custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img na rovnaku velkost
-    torchvision.transforms.Resize((70, 70)),
+    torchvision.transforms.Resize((700, 700)),
     # torchvision.transforms.RandomCrop((64, 64)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -25,7 +25,7 @@ def collate_fn(batch):
   return tuple(zip(*batch))
 
 
-train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms)
+train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms) #chcelo by to tu transform toho dictionary
 val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
 test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
 
@@ -45,7 +45,7 @@ val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=collate
 
 model = models.vgg16(weights=None)
 
-# print(model) #vypise info o modeli
+print(model) #vypise info o modeli
 
 model = model.to(device)
 
