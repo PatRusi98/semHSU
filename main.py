@@ -15,19 +15,20 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # data = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = False, transform= transforms.ToTensor())
 
 custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img na rovnaku velkost
-    torchvision.transforms.Resize((250, 250)),
+    torchvision.transforms.Resize((70, 70)),
     # torchvision.transforms.RandomCrop((64, 64)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
+def collate_fn(batch):
+  return tuple(zip(*batch))
+
+
 train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms)
 val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
 test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
 
-
-def collate_fn(batch):
-  return tuple(zip(*batch))
 
 train_loader = DataLoader(train_set, batch_size=32, shuffle=True, collate_fn=collate_fn) #collate_fn tam musi byt lebo tie anotacie to dava stale rozny shape a to collate to zabali
 test_loader = DataLoader(test_set, batch_size=32, shuffle=True, collate_fn=collate_fn)
@@ -39,10 +40,8 @@ val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=collate
 
 # print(train_set[0][0].shape) #zistenie shape dat
 
-
-for img, anotations in train_loader:
-  # print(img)
-  print(anotations)
+# for img, labels in train_loader:
+#   print(img)
 
 model = models.vgg16(weights=None)
 
@@ -58,22 +57,20 @@ def get_essentials():
   return loss_fun, optimizer
 
 
-def train_batch(data, model, loss_fun, optimizer):
+def train_batch(img, labels, model, loss_fun, optimizer):
   model.train()
-  img, true_points = data
-  pred_points = model(data)
-  loss_val = loss_fun(pred_points, true_points)
+  pred_points = model(img[0])
+  loss_val = loss_fun(pred_points, labels[0])
   loss_val.backward()
   optimizer.step()
   optimizer.zero_grad()
   return loss_val.item()
 
 @torch.no_grad()
-def val_batch(data, model, loss_fun, optimizer):
+def val_batch(img, labels, model, loss_fun, optimizer):
   model.eval()
-  img, true_points = data
-  pred_points = model(data)
-  loss_val = loss_fun(pred_points, true_points)
+  pred_points = model(img)
+  loss_val = loss_fun(pred_points, labels)
   return loss_val.item()
 
 
@@ -85,11 +82,11 @@ loss_fun, optimizer = get_essentials()
 train_epoch, val_epoch = [], []
 for epoch in range(epochs):
   train_batch_losses, val_batch_losses = [], []
-  for data in train_loader:
-    train_batch_loss = train_batch(data, model, loss_fun, optimizer)
+  for img, labels in train_loader:
+    train_batch_loss = train_batch(img, labels, model, loss_fun, optimizer)
     train_batch_losses.append(train_batch_loss)
-  for data in test_loader:
-    val_batch_loss = val_batch(data, model, loss_fun, optimizer)
+  for img, labels in test_loader:
+    val_batch_loss = val_batch(img, labels, model, loss_fun, optimizer)
     val_batch_losses.append(val_batch_loss)
   train_epoch.append(np.mean(train_batch_losses))
   val_epoch.append(np.mean(val_batch_losses))
