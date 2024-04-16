@@ -21,11 +21,14 @@ custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img n
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
 ])
 
+def test_transf(batch):
+  return torch.tensor(batch['bbox'])
+
 def collate_fn(batch):
   return tuple(zip(*batch))
 
 
-train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms ) #chcelo by to tu transform toho dictionary
+train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms, target_transform=test_transf) #chcelo by to tu transform toho dictionary
 val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
 test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
 
@@ -40,12 +43,9 @@ val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=collate
 
 # print(train_set[0][0].shape) #zistenie shape dat
 
-# for img, labels in train_loader:
-#   print(img)
-
 model = models.vgg16(weights=None)
 
-print(model) #vypise info o modeli
+# print(model) #vypise info o modeli
 
 model = model.to(device)
 
@@ -60,8 +60,9 @@ def get_essentials():
 def train_batch(img, labels, model, loss_fun, optimizer):
   images = torch.stack(img)
   model.train()
-  pred_points = model(img[0].unsqueeze(0))
-  loss_val = loss_fun(pred_points, labels[0])
+  pred_points = model(images) #vlozim do modelu cely batch
+  print(pred_points[0]) #testovaci print tu by asi chcelo si vypisat tie body ze co to vlastne je alebo jak
+  loss_val = loss_fun(pred_points, labels) #vystup pred_points bude mat druhy rozmer 1000 tak musim enastavit aj labels
   loss_val.backward()
   optimizer.step()
   optimizer.zero_grad()
