@@ -15,7 +15,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # data = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = False, transform= transforms.ToTensor())
 
 custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img na rovnaku velkost
-    torchvision.transforms.Resize((700, 700)),
+    torchvision.transforms.Resize((224, 224)),
     # torchvision.transforms.RandomCrop((64, 64)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
@@ -25,7 +25,7 @@ def collate_fn(batch):
   return tuple(zip(*batch))
 
 
-train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms) #chcelo by to tu transform toho dictionary
+train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms ) #chcelo by to tu transform toho dictionary
 val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
 test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
 
@@ -58,8 +58,9 @@ def get_essentials():
 
 
 def train_batch(img, labels, model, loss_fun, optimizer):
+  images = torch.stack(img)
   model.train()
-  pred_points = model(img[0])
+  pred_points = model(img[0].unsqueeze(0))
   loss_val = loss_fun(pred_points, labels[0])
   loss_val.backward()
   optimizer.step()
