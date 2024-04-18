@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+dropout = 0.5
 
 # data = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = False, transform= transforms.ToTensor())
 
@@ -45,7 +46,24 @@ val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=collate
 
 model = models.vgg16(weights=None)
 
-# print(model) #vypise info o modeli
+# print(model) #vypise info o modeli pred zmenou
+
+final_predictor = nn.Sequential(
+    nn.Linear(25088, 128, bias=True),
+    nn.ReLU(inplace=True),
+    nn.Dropout(p=dropout, inplace=False),
+    nn.Linear(128, 64, bias=True),
+    nn.ReLU(inplace=True),
+    nn.Dropout(p=dropout, inplace=False),
+    nn.Linear(64, 32, bias=True),
+    nn.ReLU(),
+    nn.Dropout(p=dropout, inplace=False),
+    nn.Linear(32, 4, bias=True),
+)
+
+model.classifier = final_predictor
+
+# print(model) #vypise info o modeli po zmene
 
 model = model.to(device)
 
@@ -61,6 +79,7 @@ def train_batch(img, labels, model, loss_fun, optimizer):
   images = torch.stack(img)
   model.train()
   pred_points = model(images) #vlozim do modelu cely batch
+  # print(startX, startY, endX, endY)
   print(pred_points[0]) #testovaci print tu by asi chcelo si vypisat tie body ze co to vlastne je alebo jak
   loss_val = loss_fun(pred_points, labels) #vystup pred_points bude mat druhy rozmer 1000 tak musim enastavit aj labels
   loss_val.backward()
