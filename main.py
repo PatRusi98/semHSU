@@ -48,6 +48,8 @@ def collate_fn(batch):
         points = batch[i][1]['bbox'].flatten()
         points = torch.tensor(points)
         points_out = F.pad(input=points, pad=(0, (136 - points.shape[0])), mode='constant', value=0) #pre spravny shape
+        testik = torch.tensor(batch[i][0].size).repeat(68)
+        points_out = points_out / testik # podelime shapom povodneho obrazku
         img = custom_transforms(batch[i][0])
         result[i] = list([img, points_out])
 
@@ -127,7 +129,7 @@ def val_batch(img, label, model, loss_fun, optimizer):
     return loss_val.item()
 
 
-epochs = 50
+epochs = 3
 loss_fun, optimizer = get_essentials()
 
 # training and validation loops
