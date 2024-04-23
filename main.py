@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 import torch.nn as nn
 from torchvision import models
 import matplotlib.pyplot as plt
+import torch.nn.functional as F
 
 import numpy as np
 
@@ -23,16 +24,30 @@ custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img n
 ])
 
 def test_transf(batch):
-  return torch.tensor(batch['bbox'])
+    return torch.tensor(batch['bbox'])
 
 def collate_fn(batch):
-  return tuple(zip(*batch))
+    result = list(batch)
+    for i in range(len(batch)):
+        # print(batch[i][1]['bbox'].flatten())
+        # print(batch[i][1]['bbox'].flatten()[1:][::2])
+        x_axis_points = batch[i][1]['bbox'].flatten()[0:][::2] #x suradnice
+        y_axis_points = batch[i][1]['bbox'].flatten()[1:][::2] #y suradnice
+        x_axis_points = list(x_axis_points / batch[i][0].size[0])
+        y_axis_points = list(y_axis_points / batch[i][0].size[1])
+
+        points = x_axis_points + y_axis_points
+        points = torch.tensor(points)
+        points_out = F.pad(input=points, pad=(0, (136 - points.shape[0])), mode='constant', value=0) #pre spravny shape
+        img = custom_transforms(batch[i][0])
+        result[i] = list([img, points_out])
+
+    return tuple(zip(*result))
 
 
-train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True, transform=custom_transforms, target_transform=test_transf) #chcelo by to tu transform toho dictionary
+train_set = torchvision.datasets.WIDERFace('WiderFace_data',split='train', download = True) #chcelo by to tu transform toho dictionary
 val_set = torchvision.datasets.WIDERFace('WiderFace_data',split='val', download = True, transform= custom_transforms)
 test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', download = True, transform= custom_transforms)
-
 
 train_loader = DataLoader(train_set, batch_size=32, shuffle=True, collate_fn=collate_fn) #collate_fn tam musi byt lebo tie anotacie to dava stale rozny shape a to collate to zabali
 test_loader = DataLoader(test_set, batch_size=32, shuffle=True, collate_fn=collate_fn)
@@ -49,16 +64,21 @@ model = models.vgg16(weights=None)
 # print(model) #vypise info o modeli pred zmenou
 
 final_predictor = nn.Sequential(
-    nn.Linear(25088, 128, bias=True),
+    # nn.Linear(25088, 128, bias=True),
+    # nn.ReLU(inplace=True),
+    # nn.Dropout(p=dropout, inplace=False),
+    # nn.Linear(128, 64, bias=True),
+    # nn.ReLU(inplace=True),
+    # nn.Dropout(p=dropout, inplace=False),
+    # nn.Linear(64, 32, bias=True),
+    # nn.ReLU(),
+    # nn.Dropout(p=dropout, inplace=False),
+    # nn.Linear(32, 4, bias=True),
+    #test odtial
+    nn.Linear(25088, 300, bias=True),
     nn.ReLU(inplace=True),
     nn.Dropout(p=dropout, inplace=False),
-    nn.Linear(128, 64, bias=True),
-    nn.ReLU(inplace=True),
-    nn.Dropout(p=dropout, inplace=False),
-    nn.Linear(64, 32, bias=True),
-    nn.ReLU(),
-    nn.Dropout(p=dropout, inplace=False),
-    nn.Linear(32, 4, bias=True),
+    nn.Linear(300, 136, bias=True)
 )
 
 model.classifier = final_predictor
@@ -75,12 +95,13 @@ def get_essentials():
   return loss_fun, optimizer
 
 
-def train_batch(img, labels, model, loss_fun, optimizer):
+def train_batch(img, label, model, loss_fun, optimizer):
   images = torch.stack(img)
   model.train()
   pred_points = model(images) #vlozim do modelu cely batch
   # print(startX, startY, endX, endY)
-  print(pred_points[0]) #testovaci print tu by asi chcelo si vypisat tie body ze co to vlastne je alebo jak
+  # print(pred_points[0]) #testovaci print tu by asi chcelo si vypisat tie body ze co to vlastne je alebo jak
+  labels = torch.stack(label)
   loss_val = loss_fun(pred_points, labels) #vystup pred_points bude mat druhy rozmer 1000 tak musim enastavit aj labels
   loss_val.backward()
   optimizer.step()
