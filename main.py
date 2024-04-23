@@ -116,7 +116,7 @@ def val_batch(img, labels, model, loss_fun, optimizer):
   return loss_val.item()
 
 
-epochs = 50
+epochs = 10
 loss_fun, optimizer = get_essentials()
 
 # training and validation loops
@@ -133,7 +133,7 @@ for epoch in range(epochs):
   train_epoch.append(np.mean(train_batch_losses))
   val_epoch.append(np.mean(val_batch_losses))
 
-
+print(model.parameters())
 plt.plot(range(epochs), train_epoch, label="train_loss")
 plt.plot(range(epochs), val_epoch, label="test_loss")
 plt.legend()
