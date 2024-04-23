@@ -35,12 +35,18 @@ def collate_fn(batch):
     for i in range(len(batch)):
         # print(batch[i][1]['bbox'].flatten())
         # print(batch[i][1]['bbox'].flatten()[1:][::2])
-        x_axis_points = batch[i][1]['bbox'].flatten()[0:][::2] #x suradnice
-        y_axis_points = batch[i][1]['bbox'].flatten()[1:][::2] #y suradnice
-        x_axis_points = list(x_axis_points / batch[i][0].size[0])
-        y_axis_points = list(y_axis_points / batch[i][0].size[1])
+        # pristup taky ze si dame najprv x suradnice a tak y
+        # x_axis_points = batch[i][1]['bbox'].flatten()[0:][::2] #x suradnice
+        # y_axis_points = batch[i][1]['bbox'].flatten()[1:][::2] #y suradnice
+        # x_axis_points = list(x_axis_points / batch[i][0].size[0])
+        # y_axis_points = list(y_axis_points / batch[i][0].size[1])
 
-        points = x_axis_points + y_axis_points
+        # points = x_axis_points + y_axis_points
+
+        #pristup taky ze si dame za sebou x, y, sirka, vyska
+        #todo mozno zoradit aby bola sirka vyska co najvacsia aby som detekoval najvacsie face
+        batch[i][1]['bbox'] = torch.stack(sorted(batch[i][1]['bbox'], key=lambda bbox: bbox[2], reverse=True))
+        points = batch[i][1]['bbox'].flatten()
         points = torch.tensor(points)
         points_out = F.pad(input=points, pad=(0, (136 - points.shape[0])), mode='constant', value=0) #pre spravny shape
         img = custom_transforms(batch[i][0])
