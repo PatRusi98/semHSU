@@ -129,7 +129,7 @@ def val_batch(img, label, model, loss_fun, optimizer):
     return loss_val.item()
 
 
-epochs = 3
+epochs = 20
 loss_fun, optimizer = get_essentials()
 
 # training and validation loops
