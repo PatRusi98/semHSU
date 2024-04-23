@@ -44,7 +44,6 @@ def collate_fn(batch):
         # points = x_axis_points + y_axis_points
 
         #pristup taky ze si dame za sebou x, y, sirka, vyska
-        #todo mozno zoradit aby bola sirka vyska co najvacsia aby som detekoval najvacsie face
         batch[i][1]['bbox'] = torch.stack(sorted(batch[i][1]['bbox'], key=lambda bbox: bbox[2], reverse=True))
         points = batch[i][1]['bbox'].flatten()
         points = torch.tensor(points)
@@ -128,7 +127,7 @@ def val_batch(img, label, model, loss_fun, optimizer):
     return loss_val.item()
 
 
-epochs = 2
+epochs = 50
 loss_fun, optimizer = get_essentials()
 
 # training and validation loops
