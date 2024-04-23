@@ -11,7 +11,8 @@ import torch.nn.functional as F
 
 import numpy as np
 
-parameters_path = "C:/Users/patri/PycharmProjects/semHSU/model_parameters.pth"
+#parameters_path = "C:/Users/patri/PycharmProjects/semHSU/model_parameters.pth"
+parameters_path = "C:/Users/patri/PycharmProjects/semHSU/model_parameters_mse.pth"
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
@@ -101,7 +102,8 @@ model = model.to(device)
 # getting the optimizer and loss_function
 
 def get_essentials():
-    loss_fun = nn.L1Loss()
+    #loss_fun = nn.L1Loss()
+    loss_fun = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
     return loss_fun, optimizer
 
@@ -129,7 +131,7 @@ def val_batch(img, label, model, loss_fun, optimizer):
     return loss_val.item()
 
 
-epochs = 20
+epochs = 10
 loss_fun, optimizer = get_essentials()
 
 # training and validation loops
