@@ -39,7 +39,7 @@ def collate_fn(batch):
         #pristup taky ze si dame za sebou x, y, sirka, vyska
         if batch[i][1] is not None:
             batch[i][1]['bbox'] = torch.stack(sorted(batch[i][1]['bbox'], key=lambda bbox: bbox[2], reverse=True))
-            points = {'boxes': batch[i][1]['bbox'], 'labels': torch.ones(batch[i][1]['bbox'].shape[0], dtype=torch.long)}
+            points = {'boxes': batch[i][1]['bbox'].to(device), 'labels': torch.ones(batch[i][1]['bbox'].shape[0], dtype=torch.long).to(device)}
             for j in range(len(points['boxes'])):
                 points['boxes'][j][2:][::4] += points['boxes'][j][0:][::4] #pretransformovanie vysky sirky na body
                 points['boxes'][j][3:][::4] += points['boxes'][j][1:][::4]
@@ -113,7 +113,7 @@ def val_batch(img, label, model, loss_fun, optimizer):
     return pred_points['bbox_regression'].item()
 
 
-epochs = 10
+epochs = 7
 loss_fun, optimizer = get_essentials()
 
 #Trening a validacia
