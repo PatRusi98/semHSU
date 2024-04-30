@@ -21,11 +21,11 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
 dropout = 0.5
 detection_threshold = 0.5
-size_x = 512
-size_y = 512
+size_x = 512.0
+size_y = 512.0
 
 custom_transforms = torchvision.transforms.Compose([ #spravi transformaciu img
-    torchvision.transforms.Resize((size_x, size_y)),
+    torchvision.transforms.Resize((int(size_x), int(size_y))),
     torchvision.transforms.ToTensor()
     # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) #toto teraz netreba pre SSD
 ])
@@ -42,15 +42,24 @@ def collate_fn(batch):
             filtered_bboxes = list()
             for bbox in batch[i][1]['bbox']:
                 if bbox[2] > 1 and bbox[3] > 1:
-                    filtered_bboxes.append(bbox)
-            filtered_bboxes = torch.stack(filtered_bboxes)
+                    filtered_bboxes.append(bbox.float())
+            if len(filtered_bboxes) != 0:
+                filtered_bboxes = torch.stack(filtered_bboxes)
+            else:
+                filtered_bboxes = torch.empty((0, 4))
             points = {'boxes': filtered_bboxes.to(device), 'labels': torch.ones(filtered_bboxes.shape[0], dtype=torch.long).to(device)}
             for j in range(len(points['boxes'])):
                 points['boxes'][j][2:][::4] += points['boxes'][j][0:][::4] #pretransformovanie vysky sirky na body
                 points['boxes'][j][3:][::4] += points['boxes'][j][1:][::4]
                 #pretransformovanie bboxov na spravnu velkost
-                points['boxes'][j][0:][::2] = points['boxes'][j][0:][::2] / batch[i][0].size[0] * size_x
-                points['boxes'][j][1:][::2] = points['boxes'][j][1:][::2] / batch[i][0].size[1] * size_y
+                points['boxes'][j][0:][::2] = points['boxes'][j][0:][::2] / float(batch[i][0].size[0]) * size_x
+                points['boxes'][j][1:][::2] = points['boxes'][j][1:][::2] / float(batch[i][0].size[1]) * size_y
+                # points['boxes'][j][0] = float(points['boxes'][j][0]) / float(batch[i][0].size[0]) * size_x
+                # points['boxes'][j][2] = float(points['boxes'][j][2]) / float(batch[i][0].size[0]) * size_x
+                # points['boxes'][j][1] = float(points['boxes'][j][1]) / float(batch[i][0].size[1]) * size_y
+                # points['boxes'][j][3] = float(points['boxes'][j][3]) / float(batch[i][0].size[1]) * size_y
+                if points['boxes'][j][2:][::4] - points['boxes'][j][0:][::4] < 1 or points['boxes'][j][3:][::4] - points['boxes'][j][1:][::4] < 1:
+                    print(points['boxes'][j])
             # points = torch.tensor(points)
             # points['boxes'] = F.pad(input=points['boxes'], pad=(0, (136 - points['boxes'].shape[0])), mode='constant', value=0) #pre spravny shape
             # testik = torch.tensor(batch[i][0].size).repeat(68)
@@ -82,7 +91,7 @@ model = models.detection.ssd300_vgg16(pretrained=False)  # for training
 # testujeme model upravu
 # model = models.detection.ssd300_vgg16() #pretreined for testing
 
-print(model) #vypise info o modeli
+# print(model) #vypise info o modeli
 
 model = model.to(device)
 
@@ -115,11 +124,11 @@ def val_batch(img, label, model, loss_fun, optimizer):
     pred_points = model(images.to(device), label)
     # labels = torch.stack(label)
     # loss_val = loss_fun(pred_points.cpu(), labels)
-    loss_val = model.compute_loss(label, pred_points)
+    loss_val = model.compute_loss(label, pred_points, [], [])
     return loss_val.item()
 
 
-epochs = 7
+epochs = 2
 loss_fun, optimizer = get_essentials()
 
 #Trening a validacia
@@ -139,6 +148,8 @@ for epoch in range(epochs):
         val_batch_losses.append(val_batch_loss)
     train_epoch.append(np.mean(train_batch_losses))
     val_epoch.append(np.mean(val_batch_losses))
+    print('Train: ' + np.mean(train_batch_losses))
+    print('Validation: ' + np.mean(val_batch_losses))
 
 #save model parameters
 torch.save(model.state_dict(), f=parameters_path)
