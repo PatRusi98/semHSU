@@ -11,6 +11,8 @@ import matplotlib
 import matplotlib.pyplot as plt
 import torch.nn.functional as F
 
+from torchmetrics.detection.mean_ap import MeanAveragePrecision
+
 import numpy as np
 
 #parameters_path = "C:/Users/patri/PycharmProjects/semHSU/model_parameters.pth"
@@ -121,11 +123,18 @@ def train_batch(img, label, model, loss_fun, optimizer):
 def val_batch(img, label, model, loss_fun, optimizer):
     images = torch.stack(img)
     model.eval()
-    pred_points = model(images.to(device), label)
+    pred_points = model(images.to(device))
     # labels = torch.stack(label)
     # loss_val = loss_fun(pred_points.cpu(), labels)
-    loss_val = model.compute_loss(label, pred_points, [], [])
-    return loss_val.item()
+    metric = MeanAveragePrecision(iou_type="bbox")
+
+    # Update metric with predictions and respective ground truth
+    metric.update(pred_points, label)
+
+    # Compute the results
+    precision = metric.compute()
+
+    return precision['map']
 
 
 epochs = 2
@@ -149,7 +158,7 @@ for epoch in range(epochs):
     train_epoch.append(np.mean(train_batch_losses))
     val_epoch.append(np.mean(val_batch_losses))
     print('Train: ' + np.mean(train_batch_losses))
-    print('Validation: ' + np.mean(val_batch_losses))
+    print('Validation: ' + np.mean(val_batch_losses)) #tu uz by mal byt precision
 
 #save model parameters
 torch.save(model.state_dict(), f=parameters_path)
