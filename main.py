@@ -115,7 +115,8 @@ def val_batch(img, label, model, loss_fun, optimizer):
     pred_points = model(images.to(device), label)
     # labels = torch.stack(label)
     # loss_val = loss_fun(pred_points.cpu(), labels)
-    return pred_points['bbox_regression'].item()
+    loss_val = model.compute_loss(label, pred_points)
+    return loss_val.item()
 
 
 epochs = 7
