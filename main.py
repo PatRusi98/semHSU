@@ -39,7 +39,12 @@ def collate_fn(batch):
         #pristup taky ze si dame za sebou x, y, sirka, vyska
         if batch[i][1] is not None:
             batch[i][1]['bbox'] = torch.stack(sorted(batch[i][1]['bbox'], key=lambda bbox: bbox[2], reverse=True))
-            points = {'boxes': batch[i][1]['bbox'].to(device), 'labels': torch.ones(batch[i][1]['bbox'].shape[0], dtype=torch.long).to(device)}
+            filtered_bboxes = list()
+            for bbox in batch[i][1]['bbox']:
+                if bbox[2] > 1 and bbox[3] > 1:
+                    filtered_bboxes.append(bbox)
+            filtered_bboxes = torch.stack(filtered_bboxes)
+            points = {'boxes': filtered_bboxes.to(device), 'labels': torch.ones(filtered_bboxes.shape[0], dtype=torch.long).to(device)}
             for j in range(len(points['boxes'])):
                 points['boxes'][j][2:][::4] += points['boxes'][j][0:][::4] #pretransformovanie vysky sirky na body
                 points['boxes'][j][3:][::4] += points['boxes'][j][1:][::4]
