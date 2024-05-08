@@ -64,9 +64,6 @@ class SSD300_VGG16:
                     # pretransformovanie bboxov na spravnu velkost
                     points['boxes'][j][0:][::2] = points['boxes'][j][0:][::2] / float(batch[i][0].size[0]) * self.size_x
                     points['boxes'][j][1:][::2] = points['boxes'][j][1:][::2] / float(batch[i][0].size[1]) * self.size_y
-                    if points['boxes'][j][2:][::4] - points['boxes'][j][0:][::4] < 1 or points['boxes'][j][3:][::4] - \
-                            points['boxes'][j][1:][::4] < 1:
-                        print(points['boxes'][j])
                 img = self.custom_transforms(batch[i][0])
                 result[i] = list([img, points])
             else:
