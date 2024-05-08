@@ -17,8 +17,6 @@ import os
 
 class SSD300_VGG16:
 
-    # dropout = 0.5
-    detection_threshold = 0.5
     size_x = 512.0
     size_y = 512.0
 
@@ -28,7 +26,7 @@ class SSD300_VGG16:
         # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) #toto teraz netreba pre SSD
     ])
 
-    def __init__(self, parameters_file_path, train_set, test_set, val_set):
+    def __init__(self, parameters_file_path, train_set, test_set, val_set, detection_threshold=0.5):
         self.parameters_path = parameters_file_path
         #Check for parameters_path_existance
         if not os.path.exists(self.parameters_path):
@@ -39,8 +37,9 @@ class SSD300_VGG16:
         self.val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
         self.model = models.detection.ssd300_vgg16(num_classes=2, pretrained=False)
         self.model.to(self.device)
+        self.detection_threshold = detection_threshold
 
-        #TODO load pretrained values in training
+        self.early_stopper = EarlyStopper(patience=3, min_delta=0.01)
 
 
     def collate_fn(self, batch):
@@ -68,10 +67,6 @@ class SSD300_VGG16:
                     if points['boxes'][j][2:][::4] - points['boxes'][j][0:][::4] < 1 or points['boxes'][j][3:][::4] - \
                             points['boxes'][j][1:][::4] < 1:
                         print(points['boxes'][j])
-                # points = torch.tensor(points)
-                # points['boxes'] = F.pad(input=points['boxes'], pad=(0, (136 - points['boxes'].shape[0])), mode='constant', value=0) #pre spravny shape
-                # testik = torch.tensor(batch[i][0].size).repeat(68)
-                # points_out = points_out / testik # podelime shapom povodneho obrazku
                 img = self.custom_transforms(batch[i][0])
                 result[i] = list([img, points])
             else:
@@ -106,7 +101,7 @@ class SSD300_VGG16:
 
         outputs = self.model(images.to(self.device))
 
-        # For mAP calculation using Torchmetrics.
+        # For mAP calculation
         #####################################
         for m in range(len(images)):
             true_dict = dict()
@@ -129,38 +124,49 @@ class SSD300_VGG16:
         return precision['map']
 
 
-    def train_model(self, num_of_epochs):
+    def train_model(self, num_of_epochs, use_pretrained_weights=True):
         optimizer = self.get_optimizer()
 
+        if use_pretrained_weights: #nacitame si doteraz natrenovane vahy aby sme len pokracovali v trenovani
+            self.model.load_state_dict(torch.load(self.parameters_path, map_location=self.device))
+
         # Trening a validacia
-        #TODO implementovat early stopping
 
         train_epoch, val_epoch = [], []
         for epoch in range(num_of_epochs):
             print('Epoch: ', epoch)
-            train_batch_losses, val_batch_losses = [], []
+            train_batch_losses, val_batch_precisions = [], []
             print('Train loader')
             for img, labels in self.train_loader:
                 train_batch_loss = self.train_batch(img, labels, optimizer)
                 train_batch_losses.append(train_batch_loss)
             print('Validation loader')
             for img, labels in self.val_loader:
-                val_batch_loss = self.val_batch(img, labels)
-                val_batch_losses.append(val_batch_loss)
+                val_batch_precision = self.val_batch(img, labels)
+                val_batch_precisions.append(val_batch_precision)
             train_epoch.append(np.mean(train_batch_losses))
-            val_epoch.append(np.mean(val_batch_losses))
-            #print('Train: ' + np.mean(train_batch_losses))
-            #print('Validation: ' + np.mean(val_batch_losses)) #tu uz by mal byt precision
+            val_epoch.append(np.mean(val_batch_precisions))
+            if self.early_stopper.early_stop(np.mean(val_batch_precision)):
+                print('Stopped because of early stopping on epoch' + epoch)
+                break
 
         #save model parameters
         torch.save(self.model.state_dict(), f=self.parameters_path)
 
-        #TODO upravit vypisovanie tak aby dobre bolo
+        #Vypis training loss
+        plt.subplot(11)
         plt.plot(range(num_of_epochs), train_epoch, label="train_loss")
-        plt.plot(range(num_of_epochs), val_epoch, label="val_loss")
         plt.legend()
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
+        plt.title("Training Wider Face model")
+        plt.show()
+        #Vypis validation precision
+        plt.subplot(12)
+        plt.plot(range(num_of_epochs), val_epoch, label="val_precision")
+        plt.legend()
+        plt.xlabel("Epochs")
+        plt.ylabel("Precision")
         plt.title("Training Wider Face model")
         plt.show()
 
@@ -173,39 +179,46 @@ class SSD300_VGG16:
                 for i in range(len(img_batch)):
                     img = torch.unsqueeze(img_batch[i], dim=0)
                     self.model.eval()
-                    pred_points = self.model(img.to(self.device))
-                    metric = MeanAveragePrecision(iou_type="bbox")
-
-                    # Update metric with predictions and respective ground truth
-                    testik = list([label[i]])
-                    metric.update(pred_points, testik)
-
-                    # Compute the results
-                    precision = metric.compute()
-
-                    # img = torch.unsqueeze(img_out, dim=0)
-                    # outputs = model(img.to(device))
+                    outputs = self.model(img.to(self.device))
                     img_out = torch.permute(img.squeeze(), (1, 2, 0))
-                    # # get score for all the predicted objects
-                    # pred_scores = outputs[0]['scores'].detach().cpu().numpy()
-                    # # get all the predicted bounding boxes
-                    # pred_bboxes = outputs[0]['boxes'].detach().cpu().numpy()
-                    # # get boxes above the threshold score
-                    # boxes = pred_bboxes[pred_scores >= detection_threshold].astype(np.int32)
+
+                    #vyber bounding boxov so skore vacsim ako detection_treshold
+                    # get score for all the predicted objects
+                    pred_scores = outputs[0]['scores'].cpu()
+                    # get all the predicted bounding boxes
+                    pred_bboxes = outputs[0]['boxes'].cpu()
+                    # get boxes above the threshold score
+                    boxes = pred_bboxes[pred_scores >= self.detection_threshold]
                     plt.subplot(121)
                     plt.imshow(img_out)
                     plt.title(" Actual Image ")
                     fig = plt.gcf()
                     ax = fig.add_subplot(122)
                     plt.imshow(img_out)
-                    patches = []
-                    for i in range(pred_points[0]['boxes'].shape[0]):  # vypis bounding boxov
-                        x = pred_points[0]['boxes'][i][0].cpu()
-                        y = pred_points[0]['boxes'][i][1].cpu()
-                        w = pred_points[0]['boxes'][i][2].cpu() - x
-                        h = pred_points[0]['boxes'][i][3].cpu() - y
+                    for i in range(boxes.shape[0]):  # vypis bounding boxov
+                        x = boxes[i][0]
+                        y = boxes[i][1]
+                        w = boxes[i][2] - x
+                        h = boxes[i][3] - y
                         rect1 = plt.Rectangle((x, y), width=w, height=h, fill=False, edgecolor='red',
                                               linewidth=1, facecolor='none')
                         ax.add_patch(rect1)
-                    plt.title(" Actual Image with keyponts")
+                    plt.title(" Actual Image with bounding boxes")
                     plt.show()
+
+class EarlyStopper:
+    def __init__(self, patience=1, min_delta=0.0):
+        self.patience = patience
+        self.min_delta = min_delta
+        self.counter = 0
+        self.max_validation_precision = float('inf')
+
+    def early_stop(self, validation_precision):
+        if validation_precision > self.max_validation_precision:
+            self.max_validation_precision = validation_precision
+            self.counter = 0
+        elif validation_precision < (self.max_validation_precision - self.min_delta):
+            self.counter += 1
+            if self.counter >= self.patience:
+                return True
+        return False

@@ -2,7 +2,6 @@
 
 import torchvision.datasets
 
-
 import semHSU.SSD300_VGG16 as vgg16_model
 
 
@@ -15,5 +14,7 @@ test_set = torchvision.datasets.WIDERFace('WiderFace_data',split='test', downloa
 
 ssd300_vgg16 = vgg16_model.SSD300_VGG16(parameters_path, train_set, test_set, val_set)
 
-ssd300_vgg16.test_model()
+# ssd300_vgg16.train_model(50, True) #True - pokracuje v trenovani nacitanim ulozenych vah, false prepise vahy a zacina prakticky z nuly
+
+ssd300_vgg16.test_model() #testovanie
 
