@@ -143,7 +143,7 @@ class SSD300_VGG16:
                 val_batch_precisions.append(val_batch_precision)
             train_epoch.append(np.mean(train_batch_losses))
             val_epoch.append(np.mean(val_batch_precisions))
-            if self.early_stopper.early_stop(np.mean(val_batch_precision)):
+            if self.early_stopper.early_stop(np.mean(val_batch_precisions)):
                 print('Stopped because of early stopping on epoch' + epoch)
                 break
 
