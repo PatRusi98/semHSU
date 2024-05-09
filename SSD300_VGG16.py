@@ -39,7 +39,7 @@ class SSD300_VGG16:
         self.model.to(self.device)
         self.detection_threshold = detection_threshold
 
-        self.early_stopper = EarlyStopper(patience=3, min_delta=0.01)
+        self.early_stopper = EarlyStopper(patience=3, min_delta=0.02)
 
 
     def collate_fn(self, batch):
@@ -133,7 +133,9 @@ class SSD300_VGG16:
         # Trening a validacia
 
         train_epoch, val_epoch = [], []
+        real_epoch_counter = 0
         for epoch in range(num_of_epochs):
+            real_epoch_counter += 1
             print('Epoch: ', epoch)
             train_batch_losses, val_batch_precisions = [], []
             print('Train loader')
@@ -146,24 +148,24 @@ class SSD300_VGG16:
                 val_batch_precisions.append(val_batch_precision)
             train_epoch.append(np.mean(train_batch_losses))
             val_epoch.append(np.mean(val_batch_precisions))
-            if self.early_stopper.early_stop(np.mean(val_batch_precision)):
-                print('Stopped because of early stopping on epoch' + epoch)
+            if self.early_stopper.early_stop(np.mean(val_batch_precisions)):
+                print('Stopped because of early stopping on epoch' + str(epoch))
                 break
 
         #save model parameters
         torch.save(self.model.state_dict(), f=self.parameters_path)
 
         #Vypis training loss
-        plt.subplot(11)
-        plt.plot(range(num_of_epochs), train_epoch, label="train_loss")
+        plt.subplot(121)
+        plt.plot(range(real_epoch_counter), train_epoch, label="train_loss")
         plt.legend()
         plt.xlabel("Epochs")
         plt.ylabel("Loss")
         plt.title("Training Wider Face model")
         plt.show()
         #Vypis validation precision
-        plt.subplot(12)
-        plt.plot(range(num_of_epochs), val_epoch, label="val_precision")
+        plt.subplot(122)
+        plt.plot(range(real_epoch_counter), val_epoch, label="val_precision")
         plt.legend()
         plt.xlabel("Epochs")
         plt.ylabel("Precision")
@@ -211,7 +213,7 @@ class EarlyStopper:
         self.patience = patience
         self.min_delta = min_delta
         self.counter = 0
-        self.max_validation_precision = float('inf')
+        self.max_validation_precision = float('-inf')
 
     def early_stop(self, validation_precision):
         if validation_precision > self.max_validation_precision:
