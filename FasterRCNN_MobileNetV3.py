@@ -1,46 +1,36 @@
-# importing relevant packages
-
-import torch
-import torchvision.datasets
-from matplotlib.patches import Rectangle
-from torchvision import transforms # !NEMAZAT toto treba aj ked sa tvari ze nie
-from torch.utils.data import DataLoader
-import torch.nn as nn
-from torchvision import models
-import matplotlib
-import matplotlib.pyplot as plt
-import torch.nn.functional as F
 import numpy as np
+import torch
+import torchvision
+from matplotlib import pyplot as plt
+from torchvision.models.detection import fasterrcnn_mobilenet_v3_large_320_fpn # toto nebude treba, je to na 320ky obrazky
+from torchvision.models.detection.faster_rcnn import fasterrcnn_mobilenet_v3_large_fpn
+from torch.utils.data import DataLoader
+import os
+from torchvision import transforms
 from torchmetrics.detection.mean_ap import MeanAveragePrecision
 
-import os
+class FasterRCNN_MobileNetV3:
 
-class SSD300_VGG16:
+    size_x = 500.0
+    size_y = 500.0
 
-    size_x = 512.0
-    size_y = 512.0
-
-    custom_transforms = torchvision.transforms.Compose([  # spravi transformaciu img
+    custom_transforms = torchvision.transforms.Compose([
         torchvision.transforms.Resize((int(size_x), int(size_y))),
         torchvision.transforms.ToTensor()
-        # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)) #toto teraz netreba pre SSD
     ])
 
     def __init__(self, parameters_file_path, train_set, test_set, val_set, detection_threshold=0.5):
         self.parameters_path = parameters_file_path
-        #Check for parameters_path_existance
         if not os.path.exists(self.parameters_path):
             raise FileNotFoundError(parameters_file_path)
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.train_loader = DataLoader(train_set, batch_size=32, shuffle=True, collate_fn=self.collate_fn) #collate_fn tam musi byt lebo tie anotacie to dava stale rozny shape a to collate to zabali
+        self.train_loader = DataLoader(train_set, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
         self.test_loader = DataLoader(test_set, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
         self.val_loader = DataLoader(val_set, batch_size=32, shuffle=True, collate_fn=self.collate_fn)
-        self.model = models.detection.ssd300_vgg16(num_classes=2, pretrained=False)
+        self.model = fasterrcnn_mobilenet_v3_large_fpn(num_classes=2, weights=None)
         self.model.to(self.device)
         self.detection_threshold = detection_threshold
-
-        self.early_stopper = EarlyStopper(patience=3, min_delta=0.02)
-
+        self.early_stopper = EarlyStopper(patience=10, min_delta=0.1)
 
     def collate_fn(self, batch):
         result = list(batch)
@@ -76,14 +66,13 @@ class SSD300_VGG16:
 
     def get_optimizer(self):
         optimizer = torch.optim.Adam(self.model.parameters(), lr=0.0001)
-
         return optimizer
 
     def train_batch(self, img, label, optimizer):
         images = torch.stack(img)
         self.model.train()
         optimizer.zero_grad()
-        loss_dict = self.model(images.to(self.device), label) #vlozim do modelu cely batch
+        loss_dict = self.model(images.to(self.device), label)
 
         losses = sum(loss for loss in loss_dict.values())
         loss_value = losses.item()
@@ -102,7 +91,6 @@ class SSD300_VGG16:
         outputs = self.model(images.to(self.device))
 
         # For mAP calculation
-        #####################################
         for m in range(len(images)):
             true_dict = dict()
             preds_dict = dict()
@@ -113,30 +101,25 @@ class SSD300_VGG16:
             preds_dict['labels'] = outputs[m]['labels'].detach().cpu()
             preds.append(preds_dict)
             target.append(true_dict)
-        #####################################
 
         metric = MeanAveragePrecision()
         metric.update(preds, target)
 
-        # Compute the results
         precision = metric.compute()
 
         return precision['map']
 
-
     def train_model(self, num_of_epochs, use_pretrained_weights=True):
         optimizer = self.get_optimizer()
 
-        if use_pretrained_weights: #nacitame si doteraz natrenovane vahy aby sme len pokracovali v trenovani
+        if use_pretrained_weights:
             self.model.load_state_dict(torch.load(self.parameters_path, map_location=self.device))
-
-        # Trening a validacia
 
         train_epoch, val_epoch = [], []
         real_epoch_counter = 0
         for epoch in range(num_of_epochs):
             real_epoch_counter += 1
-            print('Epoch: ', epoch)
+            print('Epoch:', epoch)
             train_batch_losses, val_batch_precisions = [], []
             print('Train loader')
             for img, labels in self.train_loader:
@@ -149,13 +132,12 @@ class SSD300_VGG16:
             train_epoch.append(np.mean(train_batch_losses))
             val_epoch.append(np.mean(val_batch_precisions))
             if self.early_stopper.early_stop(np.mean(val_batch_precisions)):
-                print('Stopped because of early stopping on epoch' + str(epoch))
+                print('Stopped because of early stopping on epoch', epoch)
                 break
 
-        #save model parameters
         torch.save(self.model.state_dict(), f=self.parameters_path)
 
-        #Vypis training loss
+        # Vypis training loss
         plt.subplot(121)
         plt.plot(range(real_epoch_counter), train_epoch, label="train_loss")
         plt.legend()
@@ -163,7 +145,7 @@ class SSD300_VGG16:
         plt.ylabel("Loss")
         plt.title("Training Wider Face model")
         plt.show()
-        #Vypis validation precision
+        # Vypis validation precision
         plt.subplot(122)
         plt.plot(range(real_epoch_counter), val_epoch, label="val_precision")
         plt.legend()
@@ -184,7 +166,7 @@ class SSD300_VGG16:
                     outputs = self.model(img.to(self.device))
                     img_out = torch.permute(img.squeeze(), (1, 2, 0))
 
-                    #vyber bounding boxov so skore vacsim ako detection_treshold
+                    # vyber bounding boxov so skore vacsim ako detection_treshold
                     # get score for all the predicted objects
                     pred_scores = outputs[0]['scores'].cpu()
                     # get all the predicted bounding boxes
@@ -203,7 +185,7 @@ class SSD300_VGG16:
                         w = boxes[i][2] - x
                         h = boxes[i][3] - y
                         rect1 = plt.Rectangle((x, y), width=w, height=h, fill=False, edgecolor='red',
-                                              linewidth=1, facecolor='none')
+                                            linewidth=1, facecolor='none')
                         ax.add_patch(rect1)
                     plt.title(" Actual Image with bounding boxes")
                     plt.show()
